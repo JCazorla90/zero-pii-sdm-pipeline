@@ -1,6 +1,19 @@
-# Zero-PII SDM Pipeline (AWS & Azure)
+# Zero-PII Multicloud SDM Pipeline (AWS & Azure)
 
-Pipeline multicloud de **Sensitive Data Masking (SDM)** para sanear documentación de facturación desde **PROD** hacia **LAB** bajo un enfoque **Zero-PII**, **mínimo privilegio (OIDC)** y **trazabilidad criptográfica extremo a extremo**.
+Pipeline de **Sensitive Data Masking (SDM)** para el saneamiento automatizado de documentos de facturación desde entornos **PROD** hacia **LAB**, diseñado bajo principios **Zero-PII**, **mínimo privilegio vía OIDC** y **trazabilidad criptográfica**.
+
+* **Stack & Controles:** Python (`PyMuPDF`), **Terraform `1.10.5`**, GitHub Actions, Azure DevOps, **Cosign** (`ECC_NIST_P256` / Key Vault `P-256`), **SBOM CycloneDX**, **Trivy** (SARIF), **Gitleaks**, firma **SSH** (`.gitsigners`) y almacenamiento **WORM** (S3 Object Lock `COMPLIANCE` y Azure Blob Immutability).
+* **Arquitectura:**
+  * *Motor SDM y Quality Gate:* Anonimización determinista por **HMAC-SHA256** con *whitelist* de emisor, tachado de QR, estampado de marca de agua y emisión de manifiesto JSON de auditoría.
+  * *Supply Chain & Runtime Gate:* Imágenes *multi-stage* por proveedor y verificación obligatoria de firma y *attestation* SBOM sobre `@sha256:...` antes de ejecutar el contenedor.
+  * *Operación y Cumplimiento:* Control de ejecución programada mediante `SDM_SCHEDULE_ENABLED`, *runbook* de rotación *zero-downtime* (`ANON_SALT` y claves Cosign) y auditorías mensuales automatizadas de IAM/RBAC con huellas `SHA-256` archivadas en modo WORM para **ISO 27001 / ENS**.
+
+## Documentación
+
+* [Arquitectura y modelo de seguridad](docs/arquitectura-y-seguridad.md)
+* [Guía de despliegue en AWS y Azure](docs/guia-despliegue-aws-azure.md)
+* [Runbook de operación, rotación y resolución de incidencias](docs/runbook-operacion-y-respuestas.md)
+
 
 ## Controles principales
 
