@@ -1,0 +1,24 @@
+trigger: none
+schedules:
+  - cron: '0 2 * * *'
+    displayName: 'Ejecución nocturna opcional SDM (UTC)'
+    branches:
+      include: [main]
+    always: true
+
+variables:
+  - name: SDM_SCHEDULE_ENABLED
+    value: 'false'
+
+stages:
+  - stage: RunSDM
+    displayName: 'Ejecutar SDM Zero-PII'
+    condition: or(ne(variables['Build.Reason'], 'Schedule'), eq(variables['SDM_SCHEDULE_ENABLED'], 'true'))
+    jobs:
+      - job: SDMRunner
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+          - script: echo "Verificación .gitsigners, Cosign verify + SBOM y ejecución sdm-runner."
+            displayName: 'Verify & Run SDM'

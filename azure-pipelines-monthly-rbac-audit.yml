@@ -1,0 +1,38 @@
+trigger: none
+pr: none
+schedules:
+  - cron: '0 6 1 * *'
+    displayName: 'Auditoría mensual RBAC SDM (UTC)'
+    branches:
+      include: [main]
+    always: true
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: MonthlyRBACAudit
+    displayName: 'Auditoría Mensual RBAC (ISO 27001 / ENS)'
+    jobs:
+      - job: AuditRBAC
+        steps:
+          - checkout: self
+          - task: AzureCLI@2
+            displayName: 'Auditar RBAC y archivar en Blob Inmutable (WORM)'
+            inputs:
+              azureSubscription: 'SC-RBAC-Audit-ReadOnly'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -euo pipefail
+                chmod +x infra/scripts/azure/audit_sdm_rbac.sh
+                ./infra/scripts/azure/audit_sdm_rbac.sh
+                mkdir -p "$(Build.ArtifactStagingDirectory)/audit-evidence"
+                mv rbac_audit_*.csv "$(Build.ArtifactStagingDirectory)/audit-evidence/"
+                sha256sum "$(Build.ArtifactStagingDirectory)/audit-evidence/"rbac_audit_*.csv > "$(Build.ArtifactStagingDirectory)/audit-evidence/SHA256SUMS.txt"
+                YEAR_MONTH=$(date -u +"%Y/%m")
+                az storage blob upload-batch --account-name "$(AUDIT_WORM_STORAGE_ACCOUNT)" --destination "audit-evidence-worm" --destination-path "azure-rbac-audit/${YEAR_MONTH}/$(Build.BuildId)" --source "$(Build.ArtifactStagingDirectory)/audit-evidence" --auth-mode login --overwrite false
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/audit-evidence'
+              artifact: 'azure-rbac-audit-evidence'

@@ -1,0 +1,5 @@
+aws_region             = "eu-south-2"
+github_repo            = "tu-org/zero-pii-sdm-pipeline"
+prod_bucket_name       = "facturas-prod-123456789012"
+lab_bucket_name        = "facturas-lab-123456789012"
+audit_worm_bucket_name = "sdm-audit-evidence-worm-123456789012"

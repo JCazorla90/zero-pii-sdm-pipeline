@@ -1,0 +1,18 @@
+name: IaC & Security Quality Gate
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+      - run: terraform -chdir=infra/terraform/aws fmt -check
+      - run: terraform -chdir=infra/terraform/azure fmt -check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r scripts/requirements.txt && pytest --cov=scripts

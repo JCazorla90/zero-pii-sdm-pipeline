@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backend.hcl
+tfplan
+crash.log
+
+# Audit & Security Artifacts
+iam_audit_*.csv
+rbac_audit_*.csv
+audit-evidence/
+sbom-*.json
+SHA256SUMS*.txt
+*.sarif
+
+# Secrets & Environment
+.env
+.env.*
+*.pem
+*.key

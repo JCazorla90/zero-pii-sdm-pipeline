@@ -1,0 +1,4 @@
+resource_group_name  = "rg-sdm-tfstate"
+storage_account_name = "stsdmtfstate001"
+container_name       = "tfstate"
+key                  = "sdm-azure.terraform.tfstate"

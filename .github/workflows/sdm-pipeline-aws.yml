@@ -1,0 +1,36 @@
+name: Zero-PII SDM Pipeline (AWS)
+on:
+  workflow_dispatch:
+    inputs:
+      sourcePrefix:
+        description: 'Prefijo S3 a procesar'
+        required: true
+        default: 'facturas/'
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  IMAGE_SHA256: '0000000000000000000000000000000000000000000000000000000000000000'
+
+jobs:
+  run-sdm:
+    name: Ejecutar Pipeline SDM Zero-PII
+    if: github.event_name != 'schedule' || vars.SDM_SCHEDULE_ENABLED == 'true'
+    environment: PROD-Data-Read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_PROD_RO_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - uses: sigstore/cosign-installer@v3.7.0
+      - name: Verificar firma Cosign y SBOM CycloneDX
+        run: |
+          IMAGE_REF="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/sdm-runner@sha256:${IMAGE_SHA256}"
+          cosign verify --key "awskms:///${{ secrets.COSIGN_KMS_KEY_ID }}" --insecure-ignore-tlog "$IMAGE_REF"
+          cosign verify-attestation --key "awskms:///${{ secrets.COSIGN_KMS_KEY_ID }}" --type cyclonedx --insecure-ignore-tlog "$IMAGE_REF" > /dev/null

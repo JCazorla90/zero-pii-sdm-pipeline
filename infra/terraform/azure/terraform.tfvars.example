@@ -1,0 +1,5 @@
+location                        = "spaincentral"
+resource_group_name             = "rg-sdm-prod"
+acr_name                        = "acrsdmprod"
+audit_worm_storage_account_name = "stsdmauditworm001"
+audit_rbac_principal_id         = "00000000-0000-0000-0000-000000000000"

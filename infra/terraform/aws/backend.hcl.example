@@ -1,0 +1,3 @@
+bucket = "tfstate-sdm-prod-123456789012"
+key    = "sdm/aws/terraform.tfstate"
+region = "eu-south-2"

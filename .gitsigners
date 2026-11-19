@@ -1,0 +1,3 @@
+# Formato: <email> namespaces="git" <clave_publica_ssh_ed25519>
+# Ejemplo:
+# tu.email@empresa.es namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...

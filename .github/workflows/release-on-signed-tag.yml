@@ -1,0 +1,58 @@
+name: Release on Signed Tag (SBOM + SHA256)
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish-release:
+    name: Verificar firma SSH, extraer SBOM y publicar Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verificar firma criptográfica SSH del tag contra origin/main:.gitsigners
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          git show origin/main:.gitsigners > /tmp/allowed_signers
+          git config gpg.format ssh
+          git config gpg.ssh.allowedSignersFile /tmp/allowed_signers
+          git verify-tag "${GITHUB_REF_NAME}"
+          rm -f /tmp/allowed_signers
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_RELEASE_RO_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: sigstore/cosign-installer@v3.7.0
+      - name: Verificar imagen fijada y descargar SBOM CycloneDX
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          COSIGN_KMS_KEY_ID: ${{ secrets.COSIGN_KMS_KEY_ID }}
+        run: |
+          set -euo pipefail
+          IMAGE_HASH=$(grep -Eo 'IMAGE_SHA256:[[:space:]]*["''']?[a-f0-9]{64}' .github/workflows/sdm-pipeline-aws.yml | head -n 1 | grep -Eo '[a-f0-9]{64}')
+          IMAGE_REF="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/sdm-runner@sha256:${IMAGE_HASH}"
+          KMS_URI="awskms:///${COSIGN_KMS_KEY_ID}"
+          cosign verify --key "$KMS_URI" --insecure-ignore-tlog "$IMAGE_REF"
+          cosign verify-attestation --key "$KMS_URI" --type cyclonedx --insecure-ignore-tlog "$IMAGE_REF" > /dev/null
+          SBOM_FILE="sbom-cyclonedx-${GITHUB_REF_NAME}.json"
+          cosign download attestation "$IMAGE_REF" | jq -r 'select(.payloadType=="application/vnd.in-toto+json") | .payload | @base64d | fromjson | select(.predicateType | contains("cyclonedx")) | .predicate' > "$SBOM_FILE"
+          sha256sum "$SBOM_FILE" > "SHA256SUMS-${GITHUB_REF_NAME}.txt"
+          echo "SBOM_FILE=${SBOM_FILE}" >> "$GITHUB_ENV"
+      - name: Extraer notas y publicar GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '$0 ~ "^## \\[" ver "\\]" { flag=1; next } /^## \[/ && flag { exit } flag { print }' CHANGELOG.md > /tmp/release-notes.md
+          [ -s /tmp/release-notes.md ] || echo "Release ${GITHUB_REF_NAME}" > /tmp/release-notes.md
+          gh release create "${GITHUB_REF_NAME}" "${SBOM_FILE}#SBOM CycloneDX (sdm-runner ${GITHUB_REF_NAME})" "SHA256SUMS-${GITHUB_REF_NAME}.txt#SHA256SUMS-${GITHUB_REF_NAME}.txt" --title "${GITHUB_REF_NAME} — Zero-PII Multicloud SDM Pipeline (AWS & Azure)" --notes-file /tmp/release-notes.md --verify-tag --latest

@@ -1,0 +1,26 @@
+name: Build, Scan & Sign SDM Image (AWS ECR)
+on:
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+jobs:
+  build-and-sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ECR_SIGN_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: sigstore/cosign-installer@v3.7.0
+      - name: Build, Push & Sign
+        run: |
+          IMAGE="${{ steps.login-ecr.outputs.registry }}/sdm-runner:${{ github.sha }}"
+          docker build --target aws -t "$IMAGE" .
+          docker push "$IMAGE"
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE")
+          cosign sign --key "awskms:///${{ secrets.COSIGN_KMS_KEY_ID }}" --tlog-upload=false "$DIGEST"

@@ -1,0 +1,40 @@
+name: Monthly IAM Least-Privilege Audit (AWS)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 1 * *'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  audit-aws-iam:
+    name: Auditar roles IAM SDM (ISO 27001 / ENS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_IAM_AUDIT_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Ejecutar auditoría IAM y generar SHA256SUMS
+        run: |
+          set -euo pipefail
+          chmod +x infra/scripts/aws/audit_aws_sdm_iam.sh
+          ./infra/scripts/aws/audit_aws_sdm_iam.sh
+          mkdir -p audit-evidence
+          mv iam_audit_*.csv audit-evidence/
+          sha256sum audit-evidence/iam_audit_*.csv > audit-evidence/SHA256SUMS.txt
+      - name: Archivar evidencias en bucket S3 Object Lock (WORM)
+        env:
+          AUDIT_BUCKET: ${{ secrets.AWS_AUDIT_WORM_BUCKET }}
+        run: |
+          set -euo pipefail
+          YEAR_MONTH=$(date -u +"%Y/%m")
+          aws s3 cp audit-evidence/ "s3://${AUDIT_BUCKET}/aws-iam-audit/${YEAR_MONTH}/${GITHUB_RUN_ID}/" --recursive --sse aws:kms
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aws-iam-audit-evidence-${{ github.run_id }}
+          path: audit-evidence/
+          retention-days: 90
